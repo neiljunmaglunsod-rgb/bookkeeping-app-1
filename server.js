@@ -1,37 +1,39 @@
 const express = require('express');
 const multer = require('multer');
-const path = require('path');
 
 const app = express();
 
 // Storage setup
 const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, 'uploads/');
-    },
-    filename: function (req, file, cb) {
-        cb(null, Date.now() + '-' + file.originalname);
-    }
+  destination: function (req, file, cb) {
+    cb(null, 'uploads/');
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + '-' + file.originalname);
+  }
 });
 
 const upload = multer({ storage: storage });
 
-// Serve form
+// Home route
 app.get('/', (req, res) => {
-    res.send(`
-        <h2>Upload Client Document</h2>
-        <form action="/upload" method="post" enctype="multipart/form-data">
-            <input type="file" name="file" />
-            <button type="submit">Upload</button>
-        </form>
-    `);
+  res.send(`
+    <h1>Upload Client Document</h1>
+    <form action="/upload" method="POST" enctype="multipart/form-data">
+      <input type="file" name="file" />
+      <button type="submit">Upload</button>
+    </form>
+  `);
 });
 
-// Handle upload
+// Upload route
 app.post('/upload', upload.single('file'), (req, res) => {
-    res.send('File uploaded successfully ✅');
+  res.send('File uploaded successfully ✅');
 });
 
-app.listen(3000, () => {
-    console.log('Server running on http://localhost:3000');
+// IMPORTANT FOR RENDER
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
