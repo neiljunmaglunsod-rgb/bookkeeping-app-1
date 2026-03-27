@@ -43,3 +43,8 @@ app.listen(PORT, () => {
 if (!fs.existsSync('uploads')) {
   fs.mkdirSync('uploads');
 }
+
+// Route
+app.get('/', (req, res) => {
+  res.send('Server is running');
+});
