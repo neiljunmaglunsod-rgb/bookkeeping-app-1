@@ -4,6 +4,11 @@ const fs = require('fs');
 
 const app = express();
 
+// ✅ Create uploads folder if not exists
+if (!fs.existsSync('uploads')) {
+  fs.mkdirSync('uploads');
+}
+
 // Storage setup
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -32,24 +37,7 @@ app.post('/upload', upload.single('file'), (req, res) => {
   res.send('File uploaded successfully ✅');
 });
 
-// IMPORTANT FOR RENDER
-const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});const fs = require('fs');
-
-// Create uploads folder if not exists
-if (!fs.existsSync('uploads')) {
-  fs.mkdirSync('uploads');
-}
-
-// Route
-app.get('/', (req, res) => {
-  res.send('Server is running');
-});
-
-// PORT for Render
+// ✅ IMPORTANT FOR RENDER
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
