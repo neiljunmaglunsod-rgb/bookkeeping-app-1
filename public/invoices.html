@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Invoices</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <nav class="navbar">
+    <div class="brand">📒 BookKeeper</div>
+    <div class="nav-links">
+      <a href="/">Dashboard</a>
+      <a href="/clients">Clients</a>
+      <a href="/invoices" class="active">Invoices</a>
+      <a href="/payments">Payments</a>
+    </div>
+  </nav>
+
+  <main class="container">
+    <div class="page-header">
+      <h1>Invoices</h1>
+      <button class="btn btn-primary" onclick="openModal()">+ New Invoice</button>
+    </div>
+
+    <div class="filter-bar">
+      <button class="filter-btn active" onclick="filterInvoices('all', this)">All</button>
+      <button class="filter-btn" onclick="filterInvoices('draft', this)">Draft</button>
+      <button class="filter-btn" onclick="filterInvoices('sent', this)">Sent</button>
+      <button class="filter-btn" onclick="filterInvoices('paid', this)">Paid</button>
+      <button class="filter-btn" onclick="filterInvoices('overdue', this)">Overdue</button>
+    </div>
+
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Invoice #</th>
+          <th>Client</th>
+          <th>Total</th>
+          <th>Due Date</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="invoiceList">
+        <tr><td colspan="6" class="empty">Loading...</td></tr>
+      </tbody>
+    </table>
+  </main>
+
+  <!-- Modal -->
+  <div class="modal-overlay" id="modal">
+    <div class="modal modal-lg">
+      <div class="modal-header">
+        <h2 id="modalTitle">New Invoice</h2>
+        <button class="close-btn" onclick="closeModal()">✕</button>
+      </div>
+      <form id="invoiceForm">
+        <input type="hidden" id="invoiceId" />
+        <div class="form-row">
+          <div class="form-group">
+            <label>Invoice Number *</label>
+            <input type="text" id="invoiceNumber" required placeholder="INV-001" />
+          </div>
+          <div class="form-group">
+            <label>Client *</label>
+            <select id="clientSelect" required>
+              <option value="">Select client</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Due Date</label>
+            <input type="date" id="dueDate" />
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <select id="status">
+              <option value="draft">Draft</option>
+              <option value="sent">Sent</option>
+              <option value="paid">Paid</option>
+              <option value="overdue">Overdue</option>
+            </select>
+          </div>
+        </div>
+
+        <h3 style="margin: 16px 0 8px">Items</h3>
+        <div id="itemsContainer"></div>
+        <button type="button" class="btn btn-outline" onclick="addItem()" style="margin-bottom:16px">+ Add Item</button>
+
+        <div class="totals">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Tax (%)</label>
+              <input type="number" id="tax" value="0" min="0" onchange="calcTotal()" />
+            </div>
+            <div class="totals-display">
+              <div>Subtotal: <strong id="subtotalDisplay">₱0</strong></div>
+              <div>Tax: <strong id="taxDisplay">₱0</strong></div>
+              <div class="total-line">Total: <strong id="totalDisplay">₱0</strong></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Notes</label>
+          <textarea id="invNotes" rows="2"></textarea>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Invoice</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    let allInvoices = [];
+    let currentFilter = 'all';
+
+    async function loadInvoices() {
+      allInvoices = await fetch('/api/invoices').then(r => r.json());
+      renderInvoices();
+    }
+
+    async function loadClients() {
+      const clients = await fetch('/api/clients').then(r => r.json());
+      const select = document.getElementById('clientSelect');
+      select.innerHTML = '<option value="">Select client</option>' +
+        clients.map(c => `<option value="${c._id}">${c.businessName || c.name}</option>`).join('');
+    }
+
+    function filterInvoices(status, btn) {
+      currentFilter = status;
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderInvoices();
+    }
+
+    function renderInvoices() {
+      const filtered = currentFilter === 'all' ? allInvoices : allInvoices.filter(i => i.status === currentFilter);
+      const tbody = document.getElementById('invoiceList');
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty">No invoices found.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = filtered.map(inv => `
+        <tr>
+          <td>${inv.invoiceNumber}</td>
+          <td>${inv.client ? (inv.client.businessName || inv.client.name) : '—'}</td>
+          <td>₱${inv.total.toLocaleString()}</td>
+          <td>${inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : '—'}</td>
+          <td><span class="badge ${inv.status}">${inv.status}</span></td>
+          <td>
+            <button class="btn btn-sm btn-outline" onclick="editInvoice('${inv._id}')">Edit</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteInvoice('${inv._id}')">Delete</button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function addItem(desc = '', qty = 1, rate = 0) {
+      const container = document.getElementById('itemsContainer');
+      const div = document.createElement('div');
+      div.className = 'item-row';
+      div.innerHTML = `
+        <input type="text" placeholder="Description" class="item-desc" value="${desc}" onchange="calcTotal()" />
+        <input type="number" placeholder="Qty" class="item-qty" value="${qty}" min="1" onchange="calcTotal()" style="width:70px" />
+        <input type="number" placeholder="Rate (₱)" class="item-rate" value="${rate}" min="0" onchange="calcTotal()" style="width:120px" />
+        <span class="item-amount">₱0</span>
+        <button type="button" class="btn btn-sm btn-danger" onclick="this.parentElement.remove(); calcTotal()">✕</button>
+      `;
+      container.appendChild(div);
+      calcTotal();
+    }
+
+    function calcTotal() {
+      const rows = document.querySelectorAll('.item-row');
+      let subtotal = 0;
+      rows.forEach(row => {
+        const qty = parseFloat(row.querySelector('.item-qty').value) || 0;
+        const rate = parseFloat(row.querySelector('.item-rate').value) || 0;
+        const amount = qty * rate;
+        row.querySelector('.item-amount').textContent = '₱' + amount.toLocaleString();
+        subtotal += amount;
+      });
+      const taxPct = parseFloat(document.getElementById('tax').value) || 0;
+      const taxAmt = subtotal * (taxPct / 100);
+      const total = subtotal + taxAmt;
+      document.getElementById('subtotalDisplay').textContent = '₱' + subtotal.toLocaleString();
+      document.getElementById('taxDisplay').textContent = '₱' + taxAmt.toLocaleString();
+      document.getElementById('totalDisplay').textContent = '₱' + total.toLocaleString();
+    }
+
+    function openModal() {
+      document.getElementById('modal').style.display = 'flex';
+      document.getElementById('invoiceForm').reset();
+      document.getElementById('invoiceId').value = '';
+      document.getElementById('itemsContainer').innerHTML = '';
+      document.getElementById('modalTitle').textContent = 'New Invoice';
+      addItem();
+      loadClients();
+    }
+
+    function closeModal() {
+      document.getElementById('modal').style.display = 'none';
+    }
+
+    async function editInvoice(id) {
+      const inv = await fetch(`/api/invoices/${id}`).then(r => r.json());
+      await loadClients();
+      document.getElementById('modal').style.display = 'flex';
+      document.getElementById('modalTitle').textContent = 'Edit Invoice';
+      document.getElementById('invoiceId').value = inv._id;
+      document.getElementById('invoiceNumber').value = inv.invoiceNumber;
+      document.getElementById('clientSelect').value = inv.client?._id || '';
+      document.getElementById('dueDate').value = inv.dueDate ? inv.dueDate.split('T')[0] : '';
+      document.getElementById('status').value = inv.status;
+      document.getElementById('tax').value = inv.tax || 0;
+      document.getElementById('invNotes').value = inv.notes || '';
+      document.getElementById('itemsContainer').innerHTML = '';
+      (inv.items || []).forEach(item => addItem(item.description, item.quantity, item.rate));
+      calcTotal();
+    }
+
+    async function deleteInvoice(id) {
+      if (!confirm('Delete this invoice?')) return;
+      await fetch(`/api/invoices/${id}`, { method: 'DELETE' });
+      loadInvoices();
+    }
+
+    document.getElementById('invoiceForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = document.getElementById('invoiceId').value;
+      const rows = document.querySelectorAll('.item-row');
+      const items = Array.from(rows).map(row => {
+        const qty = parseFloat(row.querySelector('.item-qty').value) || 1;
+        const rate = parseFloat(row.querySelector('.item-rate').value) || 0;
+        return { description: row.querySelector('.item-desc').value, quantity: qty, rate, amount: qty * rate };
+      });
+      const subtotal = items.reduce((s, i) => s + i.amount, 0);
+      const taxPct = parseFloat(document.getElementById('tax').value) || 0;
+      const taxAmt = subtotal * (taxPct / 100);
+      const data = {
+        invoiceNumber: document.getElementById('invoiceNumber').value,
+        client: document.getElementById('clientSelect').value,
+        dueDate: document.getElementById('dueDate').value,
+        status: document.getElementById('status').value,
+        items,
+        subtotal,
+        tax: taxAmt,
+        total: subtotal + taxAmt,
+        notes: document.getElementById('invNotes').value,
+      };
+      const url = id ? `/api/invoices/${id}` : '/api/invoices';
+      const method = id ? 'PUT' : 'POST';
+      await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      closeModal();
+      loadInvoices();
+    });
+
+    loadInvoices();
+  </script>
+</body>
+</html>

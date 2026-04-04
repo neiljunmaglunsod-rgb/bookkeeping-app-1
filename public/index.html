@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Bookkeeping App - Dashboard</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <nav class="navbar">
+    <div class="brand">📒 BookKeeper</div>
+    <div class="nav-links">
+      <a href="/" class="active">Dashboard</a>
+      <a href="/clients">Clients</a>
+      <a href="/invoices">Invoices</a>
+      <a href="/payments">Payments</a>
+    </div>
+  </nav>
+
+  <main class="container">
+    <h1>Dashboard</h1>
+    <p class="subtitle">Welcome back! Here's your business overview.</p>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Total Clients</div>
+        <div class="stat-value" id="totalClients">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Unpaid Invoices</div>
+        <div class="stat-value red" id="unpaidInvoices">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Paid Invoices</div>
+        <div class="stat-value green" id="paidInvoices">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Collected</div>
+        <div class="stat-value green" id="totalCollected">—</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header">
+        <h2>Recent Unpaid Invoices</h2>
+        <a href="/invoices" class="btn btn-outline">View All</a>
+      </div>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Invoice #</th>
+            <th>Client</th>
+            <th>Amount</th>
+            <th>Due Date</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="unpaidList">
+          <tr><td colspan="5" class="empty">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <script>
+    async function loadDashboard() {
+      const [clients, invoices, payments] = await Promise.all([
+        fetch('/api/clients').then(r => r.json()),
+        fetch('/api/invoices').then(r => r.json()),
+        fetch('/api/payments').then(r => r.json()),
+      ]);
+
+      document.getElementById('totalClients').textContent = clients.length;
+
+      const unpaid = invoices.filter(i => i.status !== 'paid');
+      const paid = invoices.filter(i => i.status === 'paid');
+      document.getElementById('unpaidInvoices').textContent = unpaid.length;
+      document.getElementById('paidInvoices').textContent = paid.length;
+
+      const totalCollected = payments.reduce((sum, p) => sum + p.amount, 0);
+      document.getElementById('totalCollected').textContent = '₱' + totalCollected.toLocaleString();
+
+      const tbody = document.getElementById('unpaidList');
+      if (unpaid.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty">No unpaid invoices</td></tr>';
+      } else {
+        tbody.innerHTML = unpaid.slice(0, 5).map(inv => `
+          <tr>
+            <td>${inv.invoiceNumber}</td>
+            <td>${inv.client ? (inv.client.businessName || inv.client.name) : '—'}</td>
+            <td>₱${inv.total.toLocaleString()}</td>
+            <td>${inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : '—'}</td>
+            <td><span class="badge ${inv.status}">${inv.status}</span></td>
+          </tr>
+        `).join('');
+      }
+    }
+
+    loadDashboard();
+  </script>
+</body>
+</html>
