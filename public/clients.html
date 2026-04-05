@@ -8,12 +8,13 @@
 </head>
 <body>
   <nav class="navbar">
-    <div class="brand">📒 BookKeeper</div>
+    <div class="brand">BBM BOOKKEEPING SERVICES</div>
     <div class="nav-links">
       <a href="/">Dashboard</a>
       <a href="/clients" class="active">Clients</a>
       <a href="/invoices">Invoices</a>
       <a href="/payments">Payments</a>
+      <a href="/expenses">Expenses</a>
     </div>
   </nav>
 
@@ -23,11 +24,18 @@
       <button class="btn btn-primary" onclick="openModal()">+ Add Client</button>
     </div>
 
+    <div style="margin-bottom:16px;max-width:320px;">
+      <input type="text" id="tinSearch" placeholder="Search by TIN Number..." oninput="filterByTin()"
+        style="width:100%;padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;" />
+    </div>
+
     <table class="table">
       <thead>
         <tr>
           <th>Name</th>
           <th>Business</th>
+          <th>TIN Number</th>
+          <th>Date of Birth</th>
           <th>Email</th>
           <th>Phone</th>
           <th>Service</th>
@@ -35,7 +43,7 @@
         </tr>
       </thead>
       <tbody id="clientList">
-        <tr><td colspan="6" class="empty">Loading...</td></tr>
+        <tr><td colspan="8" class="empty">Loading...</td></tr>
       </tbody>
     </table>
   </main>
@@ -57,6 +65,16 @@
           <div class="form-group">
             <label>Business Name</label>
             <input type="text" id="businessName" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>TIN Number</label>
+            <input type="text" id="tinNumber" placeholder="e.g. 123-456-789-000" />
+          </div>
+          <div class="form-group">
+            <label>Date of Birth</label>
+            <input type="date" id="dateOfBirth" />
           </div>
         </div>
         <div class="form-row">
@@ -100,17 +118,18 @@
   <script>
     let clients = [];
 
-    async function loadClients() {
-      clients = await fetch('/api/clients').then(r => r.json());
+    function renderClients(list) {
       const tbody = document.getElementById('clientList');
-      if (clients.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="empty">No clients yet. Add your first client!</td></tr>';
+      if (list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="empty">No clients found.</td></tr>';
         return;
       }
-      tbody.innerHTML = clients.map(c => `
+      tbody.innerHTML = list.map(c => `
         <tr>
           <td>${c.name}</td>
           <td>${c.businessName || '—'}</td>
+          <td>${c.tinNumber || '—'}</td>
+          <td>${c.dateOfBirth ? new Date(c.dateOfBirth).toLocaleDateString() : '—'}</td>
           <td>${c.email || '—'}</td>
           <td>${c.phone || '—'}</td>
           <td>${c.service || '—'}</td>
@@ -120,6 +139,22 @@
           </td>
         </tr>
       `).join('');
+    }
+
+    async function loadClients() {
+      clients = await fetch('/api/clients').then(r => r.json());
+      if (clients.length === 0) {
+        document.getElementById('clientList').innerHTML = '<tr><td colspan="8" class="empty">No clients yet. Add your first client!</td></tr>';
+        return;
+      }
+      renderClients(clients);
+    }
+
+    function filterByTin() {
+      const query = document.getElementById('tinSearch').value.trim().toLowerCase();
+      if (!query) { renderClients(clients); return; }
+      const filtered = clients.filter(c => (c.tinNumber || '').toLowerCase().includes(query));
+      renderClients(filtered);
     }
 
     function openModal(client = null) {
@@ -132,6 +167,8 @@
         document.getElementById('clientId').value = client._id;
         document.getElementById('name').value = client.name || '';
         document.getElementById('businessName').value = client.businessName || '';
+        document.getElementById('tinNumber').value = client.tinNumber || '';
+        document.getElementById('dateOfBirth').value = client.dateOfBirth ? client.dateOfBirth.split('T')[0] : '';
         document.getElementById('email').value = client.email || '';
         document.getElementById('phone').value = client.phone || '';
         document.getElementById('address').value = client.address || '';
@@ -161,6 +198,8 @@
       const data = {
         name: document.getElementById('name').value,
         businessName: document.getElementById('businessName').value,
+        tinNumber: document.getElementById('tinNumber').value,
+        dateOfBirth: document.getElementById('dateOfBirth').value,
         email: document.getElementById('email').value,
         phone: document.getElementById('phone').value,
         address: document.getElementById('address').value,

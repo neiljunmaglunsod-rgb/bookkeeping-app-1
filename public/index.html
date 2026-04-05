@@ -8,12 +8,13 @@
 </head>
 <body>
   <nav class="navbar">
-    <div class="brand">📒 BookKeeper</div>
+    <div class="brand">BBM BOOKKEEPING SERVICES</div>
     <div class="nav-links">
       <a href="/" class="active">Dashboard</a>
       <a href="/clients">Clients</a>
       <a href="/invoices">Invoices</a>
       <a href="/payments">Payments</a>
+      <a href="/expenses">Expenses</a>
     </div>
   </nav>
 
@@ -38,6 +39,46 @@
         <div class="stat-label">Total Collected</div>
         <div class="stat-value green" id="totalCollected">—</div>
       </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Expenses</div>
+        <div class="stat-value red" id="totalExpenses">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Net Profit / Loss</div>
+        <div class="stat-value" id="netProfit">—</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-header">
+        <h2>Profit &amp; Loss Summary</h2>
+        <a href="/expenses" class="btn btn-outline">View Expenses</a>
+      </div>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th>Total Expenses</th>
+          </tr>
+        </thead>
+        <tbody id="plByCategory">
+          <tr><td colspan="2" class="empty">Loading...</td></tr>
+        </tbody>
+        <tfoot>
+          <tr style="font-weight:bold;background:#f8f9fa;">
+            <td>Revenue (Payments Collected)</td>
+            <td id="plRevenue">—</td>
+          </tr>
+          <tr style="font-weight:bold;background:#f8f9fa;">
+            <td>Total Expenses</td>
+            <td id="plExpenses">—</td>
+          </tr>
+          <tr style="font-weight:bold;">
+            <td>Net Profit / Loss</td>
+            <td id="plNet">—</td>
+          </tr>
+        </tfoot>
+      </table>
     </div>
 
     <div class="section">
@@ -64,10 +105,12 @@
 
   <script>
     async function loadDashboard() {
-      const [clients, invoices, payments] = await Promise.all([
-        fetch('/api/clients').then(r => r.json()),
-        fetch('/api/invoices').then(r => r.json()),
-        fetch('/api/payments').then(r => r.json()),
+      const safeFetch = (url) => fetch(url).then(r => r.ok ? r.json() : []).catch(() => []);
+      const [clients, invoices, payments, expenses] = await Promise.all([
+        safeFetch('/api/clients'),
+        safeFetch('/api/invoices'),
+        safeFetch('/api/payments'),
+        safeFetch('/api/expenses'),
       ]);
 
       document.getElementById('totalClients').textContent = clients.length;
@@ -79,6 +122,33 @@
 
       const totalCollected = payments.reduce((sum, p) => sum + p.amount, 0);
       document.getElementById('totalCollected').textContent = '₱' + totalCollected.toLocaleString();
+
+      const totalExpenses = expenses.reduce((sum, e) => sum + parseFloat(e.amount || 0), 0);
+      const netProfit = totalCollected - totalExpenses;
+      document.getElementById('totalExpenses').textContent = '₱' + totalExpenses.toLocaleString();
+      const netEl = document.getElementById('netProfit');
+      netEl.textContent = '₱' + Math.abs(netProfit).toLocaleString() + (netProfit < 0 ? ' (Loss)' : '');
+      netEl.className = 'stat-value ' + (netProfit >= 0 ? 'green' : 'red');
+
+      // P&L by category
+      const byCategory = {};
+      expenses.forEach(e => {
+        const cat = e.category || 'Uncategorized';
+        byCategory[cat] = (byCategory[cat] || 0) + parseFloat(e.amount || 0);
+      });
+      const plTbody = document.getElementById('plByCategory');
+      if (Object.keys(byCategory).length === 0) {
+        plTbody.innerHTML = '<tr><td colspan="2" class="empty">No expenses recorded.</td></tr>';
+      } else {
+        plTbody.innerHTML = Object.entries(byCategory).map(([cat, amt]) =>
+          `<tr><td>${cat}</td><td>₱${amt.toLocaleString()}</td></tr>`
+        ).join('');
+      }
+      document.getElementById('plRevenue').textContent = '₱' + totalCollected.toLocaleString();
+      document.getElementById('plExpenses').textContent = '₱' + totalExpenses.toLocaleString();
+      const plNetEl = document.getElementById('plNet');
+      plNetEl.textContent = '₱' + Math.abs(netProfit).toLocaleString() + (netProfit < 0 ? ' (Loss)' : ' (Profit)');
+      plNetEl.style.color = netProfit >= 0 ? '#16a34a' : '#dc2626';
 
       const tbody = document.getElementById('unpaidList');
       if (unpaid.length === 0) {

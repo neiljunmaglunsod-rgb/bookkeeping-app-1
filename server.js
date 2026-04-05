@@ -33,12 +33,14 @@ async function startServer() {
     app.use('/api/clients', require('./routes/clients'));
     app.use('/api/invoices', require('./routes/invoices'));
     app.use('/api/payments', require('./routes/payments'));
+    app.use('/api/expenses', require('./routes/expenses'));
 
     // Frontend pages
     app.get('/', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
     app.get('/clients', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'clients.html')));
     app.get('/invoices', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'invoices.html')));
     app.get('/payments', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'payments.html')));
+    app.get('/expenses', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'expenses.html')));
 
     const PORT = process.env.PORT || 3000;
     app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

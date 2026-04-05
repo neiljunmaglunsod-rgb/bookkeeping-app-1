@@ -5,15 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Invoices</title>
   <link rel="stylesheet" href="style.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
   <nav class="navbar">
-    <div class="brand">📒 BookKeeper</div>
+    <div class="brand">BBM BOOKKEEPING SERVICES</div>
     <div class="nav-links">
       <a href="/">Dashboard</a>
       <a href="/clients">Clients</a>
       <a href="/invoices" class="active">Invoices</a>
       <a href="/payments">Payments</a>
+      <a href="/expenses">Expenses</a>
     </div>
   </nav>
 
@@ -154,6 +157,7 @@
           <td><span class="badge ${inv.status}">${inv.status}</span></td>
           <td>
             <button class="btn btn-sm btn-outline" onclick="editInvoice('${inv._id}')">Edit</button>
+            <button class="btn btn-sm btn-outline" onclick="exportPDF('${inv._id}')">PDF</button>
             <button class="btn btn-sm btn-danger" onclick="deleteInvoice('${inv._id}')">Delete</button>
           </td>
         </tr>
@@ -259,6 +263,62 @@
       closeModal();
       loadInvoices();
     });
+
+    async function exportPDF(id) {
+      const inv = await fetch(`/api/invoices/${id}`).then(r => r.json());
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+
+      // Header
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('BBM BOOKKEEPING SERVICES', 14, 20);
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'normal');
+      doc.text('INVOICE', 14, 30);
+
+      // Invoice meta
+      doc.setFontSize(10);
+      doc.text(`Invoice #: ${inv.invoiceNumber}`, 14, 42);
+      doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 49);
+      doc.text(`Due Date: ${inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : '—'}`, 14, 56);
+      doc.text(`Status: ${inv.status}`, 14, 63);
+
+      // Client
+      const clientName = inv.client ? (inv.client.businessName || inv.client.name) : '—';
+      doc.text(`Bill To: ${clientName}`, 14, 75);
+
+      // Items table
+      const rows = (inv.items || []).map(item => [
+        item.description,
+        item.quantity,
+        '₱' + parseFloat(item.rate || 0).toLocaleString(),
+        '₱' + parseFloat(item.amount || 0).toLocaleString(),
+      ]);
+
+      doc.autoTable({
+        startY: 85,
+        head: [['Description', 'Qty', 'Rate', 'Amount']],
+        body: rows,
+        theme: 'striped',
+        headStyles: { fillColor: [30, 41, 59] },
+      });
+
+      const finalY = doc.lastAutoTable.finalY + 8;
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Subtotal: ₱${parseFloat(inv.subtotal || 0).toLocaleString()}`, 130, finalY);
+      doc.text(`Tax: ₱${parseFloat(inv.tax || 0).toLocaleString()}`, 130, finalY + 7);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`Total: ₱${parseFloat(inv.total || 0).toLocaleString()}`, 130, finalY + 14);
+
+      if (inv.notes) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.text(`Notes: ${inv.notes}`, 14, finalY + 25);
+      }
+
+      doc.save(`Invoice-${inv.invoiceNumber}.pdf`);
+    }
 
     loadInvoices();
   </script>
