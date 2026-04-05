@@ -169,7 +169,7 @@
       const div = document.createElement('div');
       div.className = 'item-row';
       div.innerHTML = `
-        <input type="text" placeholder="Description" class="item-desc" value="${desc}" onchange="calcTotal()" />
+        <input type="text" placeholder="Description *" class="item-desc" value="${desc}" onchange="calcTotal()" style="border-color: ${desc ? '' : '#ccc'}" oninput="this.style.borderColor=''" />
         <input type="number" placeholder="Qty" class="item-qty" value="${qty}" min="1" onchange="calcTotal()" style="width:70px" />
         <input type="number" placeholder="Rate (₱)" class="item-rate" value="${rate}" min="0" onchange="calcTotal()" style="width:120px" />
         <span class="item-amount">₱0</span>
@@ -238,10 +238,23 @@
       e.preventDefault();
       const id = document.getElementById('invoiceId').value;
       const rows = document.querySelectorAll('.item-row');
+
+      // Validate: all item descriptions must be filled
+      let valid = true;
+      rows.forEach(row => {
+        const descInput = row.querySelector('.item-desc');
+        if (!descInput.value.trim()) {
+          descInput.style.borderColor = '#dc2626';
+          descInput.focus();
+          valid = false;
+        }
+      });
+      if (!valid) return alert('Please fill in the description for all items.');
+
       const items = Array.from(rows).map(row => {
         const qty = parseFloat(row.querySelector('.item-qty').value) || 1;
         const rate = parseFloat(row.querySelector('.item-rate').value) || 0;
-        return { description: row.querySelector('.item-desc').value, quantity: qty, rate, amount: qty * rate };
+        return { description: row.querySelector('.item-desc').value.trim(), quantity: qty, rate, amount: qty * rate };
       });
       const subtotal = items.reduce((s, i) => s + i.amount, 0);
       const taxPct = parseFloat(document.getElementById('tax').value) || 0;
@@ -269,6 +282,8 @@
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF();
 
+      const php = (val) => 'PHP ' + parseFloat(val || 0).toLocaleString('en-PH', { minimumFractionDigits: 2 });
+
       // Header
       doc.setFontSize(18);
       doc.setFont('helvetica', 'bold');
@@ -281,19 +296,19 @@
       doc.setFontSize(10);
       doc.text(`Invoice #: ${inv.invoiceNumber}`, 14, 42);
       doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, 49);
-      doc.text(`Due Date: ${inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : '—'}`, 14, 56);
+      doc.text(`Due Date: ${inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : 'N/A'}`, 14, 56);
       doc.text(`Status: ${inv.status}`, 14, 63);
 
       // Client
-      const clientName = inv.client ? (inv.client.businessName || inv.client.name) : '—';
+      const clientName = inv.client ? (inv.client.businessName || inv.client.name) : 'N/A';
       doc.text(`Bill To: ${clientName}`, 14, 75);
 
-      // Items table
+      // Items table — description may be stored as 'description' or 'desc'
       const rows = (inv.items || []).map(item => [
-        item.description,
-        item.quantity,
-        '₱' + parseFloat(item.rate || 0).toLocaleString(),
-        '₱' + parseFloat(item.amount || 0).toLocaleString(),
+        item.description || item.desc || '(no description)',
+        String(item.quantity || 1),
+        php(item.rate),
+        php(item.amount),
       ]);
 
       doc.autoTable({
@@ -302,14 +317,15 @@
         body: rows,
         theme: 'striped',
         headStyles: { fillColor: [30, 41, 59] },
+        columnStyles: { 0: { cellWidth: 80 } },
       });
 
       const finalY = doc.lastAutoTable.finalY + 8;
       doc.setFont('helvetica', 'normal');
-      doc.text(`Subtotal: ₱${parseFloat(inv.subtotal || 0).toLocaleString()}`, 130, finalY);
-      doc.text(`Tax: ₱${parseFloat(inv.tax || 0).toLocaleString()}`, 130, finalY + 7);
+      doc.text(`Subtotal: ${php(inv.subtotal)}`, 120, finalY);
+      doc.text(`Tax: ${php(inv.tax)}`, 120, finalY + 7);
       doc.setFont('helvetica', 'bold');
-      doc.text(`Total: ₱${parseFloat(inv.total || 0).toLocaleString()}`, 130, finalY + 14);
+      doc.text(`Total: ${php(inv.total)}`, 120, finalY + 14);
 
       if (inv.notes) {
         doc.setFont('helvetica', 'normal');
